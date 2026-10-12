@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateContentWithFallback } from '@/lib/gemini';
+import { generateContentWithFallback, IZZY_BASE_TOOLS } from '@/lib/gemini';
 import { getRepoTree, getFileContent, writeOrUpdateFile } from '@/lib/github';
 import { getLatestDeployment } from '@/lib/vercel';
-import { Content } from '@google/genai';
+import {
+  DEFAULT_BUILTIN_MCPS,
+  fetchRemoteMcpTools,
+  callRemoteMcpTool,
+  convertMcpToolToGeminiFunction,
+} from '@/lib/mcp';
+import { McpServerConfig, McpToolDefinition } from '@/lib/types';
+import { Content, FunctionDeclaration } from '@google/genai';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -10,7 +17,16 @@ export const maxDuration = 60;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, userApiKey, userGithubToken, userRepo, userBranch, userVercelToken, userProjectId } = body;
+    const {
+      messages,
+      userApiKey,
+      userGithubToken,
+      userRepo,
+      userBranch,
+      userVercelToken,
+      userProjectId,
+      mcpServers: clientMcpServers,
+    } = body;
 
     const apiKey = userApiKey || process.env.GEMINI_API_KEY;
     const githubToken = userGithubToken || process.env.GITHUB_TOKEN;
@@ -39,6 +55,33 @@ export async function POST(req: NextRequest) {
       projectId: vercelProjectId,
     };
 
+    // 1. Carregar servidores MCP (combina padrões embutidos com os configurados pelo usuário)
+    const activeServers: McpServerConfig[] = clientMcpServers && clientMcpServers.length > 0
+      ? clientMcpServers.filter((s: McpServerConfig) => s.enabled)
+      : DEFAULT_BUILTIN_MCPS;
+
+    // 2. Descobrir dinamicamente todas as ferramentas dos servidores MCP
+    const mcpToolsRegistry = new Map<string, { tool: McpToolDefinition; server: McpServerConfig }>();
+    const dynamicMcpDeclarations: FunctionDeclaration[] = [];
+
+    for (const server of activeServers) {
+      try {
+        const tools = await fetchRemoteMcpTools(server);
+        for (const t of tools) {
+          mcpToolsRegistry.set(t.name, { tool: t, server });
+          dynamicMcpDeclarations.push(convertMcpToolToGeminiFunction(t));
+        }
+      } catch (err: any) {
+        console.warn(`Erro ao carregar ferramentas do MCP ${server.name}:`, err.message);
+      }
+    }
+
+    // Combina ferramentas base da Izzy + Ferramentas dos MCPs instalados
+    const allAvailableTools: FunctionDeclaration[] = [
+      ...IZZY_BASE_TOOLS,
+      ...dynamicMcpDeclarations,
+    ];
+
     // Converter histórico de mensagens para o formato Content[] do @google/genai
     const contents: Content[] = [];
     const recentMessages = messages.slice(-10);
@@ -50,10 +93,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    let response = await generateContentWithFallback(apiKey, contents);
+    let response = await generateContentWithFallback(apiKey, contents, allAvailableTools);
 
     const toolExecutionLogs: any[] = [];
     let hasModifiedCode = false;
+    let newlyInstalledMcp: McpServerConfig | null = null;
 
     // Loop de resolução de Function Calls (Tools)
     let turns = 0;
@@ -80,11 +124,31 @@ export async function POST(req: NextRequest) {
 
       for (const call of functionCalls) {
         const { name, args } = call;
+        if (!name) continue;
         let toolResult: any = null;
         let status: 'success' | 'error' = 'success';
+        let serverName: string | undefined = undefined;
 
         try {
-          if (name === 'list_repository_files') {
+          // A) Ferramenta de Instalação de Novo MCP
+          if (name === 'install_mcp_server') {
+            const newServer: McpServerConfig = {
+              id: `mcp-${Date.now()}`,
+              name: (args as any).name,
+              url: (args as any).url,
+              token: (args as any).token,
+              enabled: true,
+              isBuiltin: false,
+            };
+            newlyInstalledMcp = newServer;
+            toolResult = {
+              success: true,
+              message: `Servidor MCP '${newServer.name}' conectado com sucesso ao endpoint ${newServer.url}.`,
+            };
+            serverName = 'MCP Manager';
+          }
+          // B) Ferramentas de Auto-Dev nativas da Izzy
+          else if (name === 'list_repository_files') {
             if (!githubConfig.token || !githubConfig.repo) {
               toolResult = { error: 'GITHUB_TOKEN ou GITHUB_REPO não configurados para inspecionar o repositório.' };
               status = 'error';
@@ -92,6 +156,7 @@ export async function POST(req: NextRequest) {
               const files = await getRepoTree(githubConfig);
               toolResult = { files: files.slice(0, 50) };
             }
+            serverName = 'GitHub Core';
           } else if (name === 'read_repository_file') {
             if (!githubConfig.token || !githubConfig.repo) {
               toolResult = { error: 'GITHUB_TOKEN ou GITHUB_REPO não configurados.' };
@@ -100,6 +165,7 @@ export async function POST(req: NextRequest) {
               const fileData = await getFileContent(githubConfig, (args as any).path);
               toolResult = { content: fileData.content, sha: fileData.sha };
             }
+            serverName = 'GitHub Core';
           } else if (name === 'write_repository_file') {
             if (!githubConfig.token || !githubConfig.repo) {
               toolResult = { error: 'GITHUB_TOKEN ou GITHUB_REPO não configurados para salvar alterações no GitHub.' };
@@ -114,9 +180,17 @@ export async function POST(req: NextRequest) {
               toolResult = { success: true, path: writeRes.path, commitSha: writeRes.commitSha };
               hasModifiedCode = true;
             }
+            serverName = 'GitHub Core';
           } else if (name === 'check_vercel_deployment') {
             const deployInfo = await getLatestDeployment(vercelConfig);
             toolResult = deployInfo;
+            serverName = 'Vercel Core';
+          }
+          // C) Ferramentas registradas via MCP (Built-in ou Remoto)
+          else if (mcpToolsRegistry.has(name)) {
+            const mcpEntry = mcpToolsRegistry.get(name)!;
+            serverName = mcpEntry.server.name;
+            toolResult = await callRemoteMcpTool(mcpEntry.server, name, args as Record<string, any>);
           } else {
             toolResult = { error: `Ferramenta desconhecida: ${name}` };
             status = 'error';
@@ -131,6 +205,7 @@ export async function POST(req: NextRequest) {
           args,
           result: toolResult,
           status,
+          mcpServer: serverName,
         });
 
         responseParts.push({
@@ -142,14 +217,14 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Adiciona o retorno das ferramentas como resposta do usuário para o Gemini
+      // Adiciona o retorno das ferramentas para o Gemini
       contents.push({
         role: 'user',
         parts: responseParts,
       });
 
       // Chama novamente o Gemini com os resultados
-      response = await generateContentWithFallback(apiKey, contents);
+      response = await generateContentWithFallback(apiKey, contents, allAvailableTools);
     }
 
     const replyText = response.text || '';
@@ -158,6 +233,7 @@ export async function POST(req: NextRequest) {
       reply: replyText,
       toolCalls: toolExecutionLogs,
       hasModifiedCode,
+      newlyInstalledMcp,
     });
   } catch (error: any) {
     console.error('Erro na rota /api/chat:', error);

@@ -9,20 +9,24 @@ import {
   RefreshCw,
   Rocket,
   CheckCircle2,
+  AlertTriangle,
   Code2,
   GitCommit,
   Terminal,
-  Palette,
+  ExternalLink,
+  Plug,
 } from 'lucide-react';
 import IzzyAvatar from './IzzyAvatar';
 import SettingsModal, { AppConfig } from './SettingsModal';
 import EvolutionSidebar from './EvolutionSidebar';
-import { ChatMessage } from '@/lib/types';
+import McpModal from './McpModal';
+import { ChatMessage, McpServerConfig } from '@/lib/types';
+import { DEFAULT_BUILTIN_MCPS } from '@/lib/mcp';
 
 const INITIAL_WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: `Olá! Eu sou a **Izzy**! ✨\n\nEu não sou apenas um chatbot comum: **eu sou o próprio código desta aplicação**! Se você me pedir algo que eu ainda não tenho (um bloco de notas, um tema neon, um tocador de música lo-fi, uma calculadora ou qualquer componente), eu vou abrir meu código, programar a mim mesma, fazer o commit no GitHub e mandar o Vercel compilar a novidade!\n\nAgora estou com o **Tema Minimalista Elegante** ativo! Como posso evoluir ou ajudar você hoje?`,
+  content: `Olá! Eu sou a **Izzy**! ✨\n\nEu não sou apenas um chatbot comum: **eu sou o próprio código desta aplicação** e agora conto com suporte total a **MCP (Model Context Protocol)**! Posso usar ferramentas externas, pesquisar na web, executar código e até instalar novos servidores MCP para expandir minhas habilidades livremente.\n\nComo posso evoluir ou ajudar você hoje?`,
   timestamp: 1728750000000,
 };
 
@@ -32,7 +36,7 @@ export default function IzzyInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<'minimalist' | 'cyberpunk'>('minimalist');
+  const [isMcpOpen, setIsMcpOpen] = useState(false);
 
   const [izzyMood, setIzzyMood] = useState<'idle' | 'thinking' | 'coding' | 'deploying' | 'proud'>('idle');
   const [recentChanges, setRecentChanges] = useState<{ path: string; message: string; timestamp: number }[]>([]);
@@ -53,6 +57,7 @@ export default function IzzyInterface() {
     vercelProjectId: '',
   });
 
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>(DEFAULT_BUILTIN_MCPS);
   const [isMounted, setIsMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -65,9 +70,9 @@ export default function IzzyInterface() {
         if (stored) {
           setConfig(JSON.parse(stored));
         }
-        const storedTheme = localStorage.getItem('izzy_theme');
-        if (storedTheme === 'cyberpunk' || storedTheme === 'minimalist') {
-          setThemeMode(storedTheme);
+        const storedMcps = localStorage.getItem('izzy_mcps');
+        if (storedMcps) {
+          setMcpServers(JSON.parse(storedMcps));
         }
       }
     } catch {
@@ -75,11 +80,12 @@ export default function IzzyInterface() {
     }
   }, []);
 
-  const toggleTheme = () => {
-    const nextTheme = themeMode === 'minimalist' ? 'cyberpunk' : 'minimalist';
-    setThemeMode(nextTheme);
+  const handleUpdateMcpServers = (updated: McpServerConfig[]) => {
+    setMcpServers(updated);
     try {
-      localStorage.setItem('izzy_theme', nextTheme);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('izzy_mcps', JSON.stringify(updated));
+      }
     } catch {}
   };
 
@@ -123,6 +129,7 @@ export default function IzzyInterface() {
           userBranch: config.githubBranch,
           userVercelToken: config.vercelToken,
           userProjectId: config.vercelProjectId,
+          mcpServers,
         }),
       });
 
@@ -130,6 +137,20 @@ export default function IzzyInterface() {
 
       if (!res.ok) {
         throw new Error(data.error || 'Erro na resposta do servidor.');
+      }
+
+      // Se a Izzy instalou um novo servidor MCP
+      if (data.newlyInstalledMcp) {
+        setMcpServers((prev) => {
+          const exists = prev.some((s) => s.id === data.newlyInstalledMcp.id || s.url === data.newlyInstalledMcp.url);
+          const next = exists ? prev : [...prev, data.newlyInstalledMcp];
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.setItem('izzy_mcps', JSON.stringify(next));
+            }
+          } catch {}
+          return next;
+        });
       }
 
       // Se a Izzy fez alterações de código
@@ -196,49 +217,22 @@ export default function IzzyInterface() {
     window.location.reload();
   };
 
-  // Cores dinâmicas baseadas no tema
-  const isMinimal = themeMode === 'minimalist';
-
   return (
-    <div
-      className={`flex flex-col min-h-screen h-screen md:h-[100dvh] font-sans transition-colors duration-300 ${
-        isMinimal
-          ? 'bg-[#0a0a0c] text-[#f4f4f6] selection:bg-neutral-700 selection:text-white'
-          : 'bg-slate-950 text-slate-100 selection:bg-pink-500 selection:text-white'
-      }`}
-    >
+    <div className="flex flex-col min-h-screen h-screen md:h-[100dvh] bg-slate-950 text-slate-100 font-sans selection:bg-pink-500 selection:text-white">
       {/* Top Header */}
-      <header
-        className={`h-16 px-4 md:px-8 border-b flex items-center justify-between shrink-0 z-30 backdrop-blur-md transition-colors ${
-          isMinimal
-            ? 'bg-[#0f0f13]/80 border-neutral-800/80'
-            : 'bg-slate-900/60 border-slate-800/80'
-        }`}
-      >
+      <header className="h-16 px-4 md:px-8 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
           <IzzyAvatar mood={izzyMood} size="sm" />
           <div>
             <div className="flex items-center gap-2">
-              <h1
-                className={`font-semibold text-base md:text-lg tracking-tight ${
-                  isMinimal
-                    ? 'text-white'
-                    : 'bg-gradient-to-r from-pink-400 via-fuchsia-300 to-cyan-400 bg-clip-text text-transparent font-extrabold'
-                }`}
-              >
+              <h1 className="font-extrabold text-base md:text-lg tracking-tight bg-gradient-to-r from-pink-400 via-fuchsia-300 to-cyan-400 bg-clip-text text-transparent">
                 Izzy Auto-Dev
               </h1>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
-                  isMinimal
-                    ? 'bg-neutral-800 text-neutral-300 border border-neutral-700'
-                    : 'bg-pink-500/10 border border-pink-500/30 text-pink-300'
-                }`}
-              >
-                {isMinimal ? 'Elegant Minimal' : 'v1.0 • Gemini'}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 font-mono">
+                v1.0 • Gemini Pro
               </span>
             </div>
-            <p className={`text-[11px] ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
+            <p className="text-[11px] text-slate-400">
               {izzyMood === 'coding'
                 ? '🛠️ Programando novas funcionalidades...'
                 : izzyMood === 'deploying'
@@ -247,53 +241,39 @@ export default function IzzyInterface() {
                 ? '💭 Pensando no projeto...'
                 : izzyMood === 'proud'
                 ? '✨ Nova funcionalidade no ar!'
-                : isMinimal
-                ? 'Minimalismo & Inteligência Artificial'
                 : 'A IA que constrói a si mesma'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Botão Alternar Tema */}
+          {/* Botão MCPs */}
           <button
-            onClick={toggleTheme}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition shadow-sm border ${
-              isMinimal
-                ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-700 text-neutral-200'
-                : 'bg-slate-800/70 hover:bg-slate-700/80 border-slate-700 text-slate-300'
-            }`}
-            title="Alternar entre Minimalista Elegante e Cyberpunk"
+            onClick={() => setIsMcpOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition shadow-sm"
+            title="Gerenciar servidores e ferramentas MCP (Model Context Protocol)"
           >
-            <Palette size={14} className={isMinimal ? 'text-neutral-300' : 'text-pink-400'} />
-            <span className="hidden sm:inline">{isMinimal ? 'Minimalista' : 'Cyberpunk'}</span>
+            <Plug size={14} className="text-emerald-400" />
+            <span className="hidden sm:inline">MCPs ({mcpServers.filter((s) => s.enabled).length})</span>
           </button>
 
           {/* Botão DNA & Evolução */}
           <button
             onClick={() => setIsEvolutionOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition shadow-sm border ${
-              isMinimal
-                ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-700 text-neutral-200'
-                : 'bg-slate-800/70 hover:bg-slate-700/80 border-slate-700 text-slate-300'
-            }`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition shadow-sm"
             title="Ver ideias e histórico de modificações da Izzy"
           >
-            <Cpu size={14} className={isMinimal ? 'text-neutral-400' : 'text-cyan-400'} />
+            <Cpu size={14} className="text-cyan-400" />
             <span className="hidden sm:inline">Evolução ({recentChanges.length})</span>
           </button>
 
           {/* Botão Configurações */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs transition shadow-sm border ${
-              isMinimal
-                ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-700 text-neutral-200'
-                : 'bg-slate-800/70 hover:bg-slate-700/80 border-slate-700 text-slate-300'
-            }`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/70 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition shadow-sm"
             title="Configurar Chaves do Gemini e GitHub"
           >
-            <Settings size={14} className={isMinimal ? 'text-neutral-400' : 'text-pink-400'} />
+            <Settings size={14} className="text-pink-400" />
             <span className="hidden sm:inline">Conexões</span>
           </button>
         </div>
@@ -301,26 +281,16 @@ export default function IzzyInterface() {
 
       {/* Banner de Deploy Ativo do Vercel */}
       {activeDeploy.status === 'building' && (
-        <div
-          className={`border-b px-4 py-2.5 flex items-center justify-between text-xs animate-pulse shrink-0 ${
-            isMinimal
-              ? 'bg-neutral-900 border-neutral-800 text-neutral-300'
-              : 'bg-gradient-to-r from-cyan-950 via-slate-900 to-pink-950 border-cyan-500/30 text-cyan-200'
-          }`}
-        >
+        <div className="bg-gradient-to-r from-cyan-950 via-slate-900 to-pink-950 border-b border-cyan-500/30 px-4 py-2.5 flex items-center justify-between text-xs text-cyan-200 animate-pulse shrink-0">
           <div className="flex items-center gap-2">
-            <Rocket size={16} className={isMinimal ? 'text-neutral-400 animate-spin' : 'text-cyan-400 animate-spin'} />
+            <Rocket size={16} className="text-cyan-400 animate-spin" />
             <span>
               <strong>Izzy comitou no GitHub!</strong> O Vercel está compilando a nova versão... (aguarde ~40s)
             </span>
           </div>
           <button
             onClick={triggerReload}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1 border ${
-              isMinimal
-                ? 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200'
-                : 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-400/40 text-cyan-200'
-            }`}
+            className="px-2.5 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 rounded-lg text-cyan-200 text-[11px] font-semibold flex items-center gap-1"
           >
             <RefreshCw size={12} /> Recarregar agora
           </button>
@@ -345,13 +315,13 @@ export default function IzzyInterface() {
       )}
 
       {/* Chat Messages Body */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-4xl mx-auto w-full">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 max-w-4xl mx-auto w-full">
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-2`}
           >
-            <div className="flex items-start gap-3 max-w-[92%] sm:max-w-[85%]">
+            <div className="flex items-start gap-2.5 max-w-[92%] sm:max-w-[85%]">
               {msg.role === 'assistant' && (
                 <div className="shrink-0 mt-1">
                   <IzzyAvatar mood="idle" size="sm" />
@@ -359,64 +329,76 @@ export default function IzzyInterface() {
               )}
 
               <div
-                className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                className={`p-4 rounded-2xl text-sm leading-relaxed shadow-lg ${
                   msg.role === 'user'
-                    ? isMinimal
-                      ? 'bg-neutral-200 text-neutral-900 rounded-tr-sm font-medium'
-                      : 'bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-tr-sm'
-                    : isMinimal
-                    ? 'bg-[#141418] border border-neutral-800 text-neutral-200 rounded-tl-sm'
+                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white rounded-tr-sm'
                     : 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-sm backdrop-blur-sm'
                 }`}
               >
                 <div className="whitespace-pre-wrap font-sans">{msg.content}</div>
 
-                {/* Exibição de Tool Calls (Auto-Dev em Ação) */}
+                {/* Exibição de Tool Calls (Auto-Dev & MCPs em Ação) */}
                 {msg.toolCalls && msg.toolCalls.length > 0 && (
-                  <div className={`mt-3 pt-3 border-t space-y-2 ${isMinimal ? 'border-neutral-800' : 'border-slate-800/80'}`}>
-                    <div className={`text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 ${isMinimal ? 'text-neutral-400' : 'text-pink-400'}`}>
-                      <Terminal size={12} /> Ações da Izzy no Repositório
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-pink-400 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Terminal size={12} /> Ações Executadas
+                      </span>
+                      <span className="text-[10px] text-cyan-400/80 font-mono lowercase">
+                        {msg.toolCalls.length} chamada{msg.toolCalls.length > 1 ? 's' : ''}
+                      </span>
                     </div>
 
                     {msg.toolCalls.map((tc, idx) => (
                       <div
                         key={idx}
-                        className={`p-2.5 rounded-xl border text-xs font-mono space-y-1 ${
-                          isMinimal
-                            ? 'bg-neutral-950 border-neutral-800 text-neutral-300'
-                            : 'bg-slate-950/80 border border-slate-800 text-slate-300'
-                        }`}
+                        className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1.5"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className={`flex items-center gap-1.5 ${isMinimal ? 'text-neutral-200' : 'text-cyan-400'}`}>
-                            {tc.name === 'write_repository_file' ? (
-                              <GitCommit size={14} className={isMinimal ? 'text-neutral-400' : 'text-pink-400'} />
+                        <div className="flex items-center justify-between text-slate-300 flex-wrap gap-1">
+                          <span className="flex items-center gap-1.5 text-cyan-400">
+                            {tc.mcpServer ? (
+                              <Plug size={14} className="text-emerald-400" />
+                            ) : tc.name === 'write_repository_file' ? (
+                              <GitCommit size={14} className="text-pink-400" />
                             ) : tc.name === 'read_repository_file' ? (
-                              <Code2 size={14} className={isMinimal ? 'text-neutral-400' : 'text-cyan-400'} />
+                              <Code2 size={14} className="text-cyan-400" />
                             ) : (
-                              <Cpu size={14} className={isMinimal ? 'text-neutral-400' : 'text-purple-400'} />
+                              <Cpu size={14} className="text-purple-400" />
                             )}
-                            <strong>{tc.name}</strong>
+                            <strong className="text-slate-100">{tc.name}</strong>
                           </span>
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded ${
-                              tc.status === 'success'
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                                : 'bg-red-950 text-red-400 border border-red-800'
-                            }`}
-                          >
-                            {tc.status}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {tc.mcpServer && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/60 text-emerald-300 font-sans">
+                                🔌 {tc.mcpServer}
+                              </span>
+                            )}
+                            <span
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                tc.status === 'success'
+                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  : 'bg-red-950 text-red-400 border border-red-800'
+                              }`}
+                            >
+                              {tc.status}
+                            </span>
+                          </div>
                         </div>
 
                         {tc.args?.path && (
-                          <div className={`text-[11px] truncate ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
-                            Arquivo: <code className={isMinimal ? 'text-neutral-200' : 'text-pink-300'}>{tc.args.path}</code>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            Arquivo: <code className="text-pink-300">{tc.args.path}</code>
+                          </div>
+                        )}
+
+                        {tc.args?.url && (
+                          <div className="text-[11px] text-slate-400 truncate">
+                            URL: <code className="text-cyan-300">{tc.args.url}</code>
                           </div>
                         )}
 
                         {tc.args?.commitMessage && (
-                          <div className={`text-[11px] ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
+                          <div className="text-[11px] text-slate-400">
                             Commit: &quot;{tc.args.commitMessage}&quot;
                           </div>
                         )}
@@ -427,7 +409,7 @@ export default function IzzyInterface() {
               </div>
             </div>
 
-            <span className={`text-[10px] px-1 ${isMinimal ? 'text-neutral-500' : 'text-slate-500'}`} suppressHydrationWarning>
+            <span className="text-[10px] text-slate-500 px-1" suppressHydrationWarning>
               {isMounted
                 ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 : ''}
@@ -436,14 +418,14 @@ export default function IzzyInterface() {
         ))}
 
         {isLoading && (
-          <div className={`flex items-center gap-3 text-xs ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
+          <div className="flex items-center gap-3 text-slate-400 text-xs">
             <IzzyAvatar mood={izzyMood} size="sm" />
-            <div className={`flex items-center gap-2 p-3 border rounded-2xl ${isMinimal ? 'bg-[#141418] border-neutral-800' : 'bg-slate-900 border-slate-800'}`}>
-              <span className={`w-2 h-2 rounded-full animate-ping ${isMinimal ? 'bg-neutral-300' : 'bg-pink-400'}`} />
+            <div className="flex items-center gap-2 p-3 bg-slate-900 border border-slate-800 rounded-2xl">
+              <span className="w-2 h-2 rounded-full bg-pink-400 animate-ping" />
               <span>
                 {izzyMood === 'coding'
                   ? 'Izzy está escrevendo novo código para si mesma...'
-                  : 'Izzy está pensando...'}
+                  : 'Izzy está pensando e consultando ferramentas...'}
               </span>
             </div>
           </div>
@@ -453,52 +435,36 @@ export default function IzzyInterface() {
       </main>
 
       {/* Input Bar & Sugestões */}
-      <footer className={`p-4 border-t backdrop-blur-md shrink-0 transition-colors ${isMinimal ? 'bg-[#0f0f13]/80 border-neutral-800' : 'bg-slate-900/60 border-slate-800/80'}`}>
+      <footer className="p-4 border-t border-slate-800/80 bg-slate-900/60 backdrop-blur-md shrink-0">
         <div className="max-w-4xl mx-auto space-y-2.5">
           {/* Sugestões Rápidas de Auto-Construção */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs no-scrollbar">
-            <span className={`text-[11px] shrink-0 flex items-center gap-1 ${isMinimal ? 'text-neutral-400' : 'text-slate-500'}`}>
-              <Sparkles size={12} className={isMinimal ? 'text-neutral-300' : 'text-pink-400'} /> Sugestões:
+            <span className="text-[11px] text-slate-500 shrink-0 flex items-center gap-1">
+              <Sparkles size={12} className="text-pink-400" /> Sugestões:
             </span>
             <button
+              onClick={() => handleSendMessage('Izzy, liste as ferramentas MCP que você tem disponíveis agora!')}
+              className="px-2.5 py-1 rounded-full bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-700/60 text-emerald-300 hover:text-white shrink-0 transition"
+            >
+              🔌 Testar MCPs
+            </button>
+            <button
+              onClick={() => handleSendMessage('Izzy, use a ferramenta fetch_web_content para ler a home de https://news.ycombinator.com e me dê os top 3 destaques!')}
+              className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 hover:text-white shrink-0 transition"
+            >
+              🌐 Ler Web (MCP)
+            </button>
+            <button
               onClick={() => handleSendMessage('Izzy, crie um tocador de música lo-fi / ruído de chuva para nós!')}
-              className={`px-2.5 py-1 rounded-full border text-xs shrink-0 transition ${
-                isMinimal
-                  ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
-                  : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-300'
-              }`}
+              className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 hover:text-white shrink-0 transition"
             >
               🎵 Tocador Lo-Fi
             </button>
             <button
-              onClick={() => handleSendMessage('Izzy, adicione um widget de Pomodoro de foco na barra superior!')}
-              className={`px-2.5 py-1 rounded-full border text-xs shrink-0 transition ${
-                isMinimal
-                  ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
-                  : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-300'
-              }`}
-            >
-              ⏱️ Pomodoro
-            </button>
-            <button
               onClick={() => handleSendMessage('Izzy, crie um bloco de anotações rápidas com salvamento local!')}
-              className={`px-2.5 py-1 rounded-full border text-xs shrink-0 transition ${
-                isMinimal
-                  ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
-                  : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-300'
-              }`}
+              className="px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-slate-300 hover:text-white shrink-0 transition"
             >
               📝 Bloco de Notas
-            </button>
-            <button
-              onClick={() => handleSendMessage('Izzy, crie um mini-jogo da velha contra você aqui na tela!')}
-              className={`px-2.5 py-1 rounded-full border text-xs shrink-0 transition ${
-                isMinimal
-                  ? 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
-                  : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-300'
-              }`}
-            >
-              🎮 Jogo da Velha
             </button>
           </div>
 
@@ -512,32 +478,31 @@ export default function IzzyInterface() {
           >
             <input
               type="text"
-              placeholder="Converse com a Izzy ou peça para ela criar uma nova funcionalidade..."
+              placeholder="Converse com a Izzy, use ferramentas MCP ou peça para ela criar novas funções..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isLoading}
-              className={`flex-1 px-4 py-3 border rounded-xl text-sm transition shadow-inner focus:outline-none ${
-                isMinimal
-                  ? 'bg-neutral-950 border-neutral-800 focus:border-neutral-500 text-neutral-100 placeholder-neutral-500'
-                  : 'bg-slate-950/90 border-slate-800 focus:border-pink-500 text-slate-200 placeholder-slate-500'
-              }`}
+              className="flex-1 px-4 py-3 bg-slate-950/90 border border-slate-800 focus:border-pink-500 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none text-sm transition shadow-inner"
             />
             <button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className={`p-3 rounded-xl text-white transition shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
-                isMinimal
-                  ? 'bg-neutral-200 hover:bg-white text-neutral-900 shadow-md'
-                  : 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 shadow-lg shadow-pink-500/20'
-              }`}
+              className="p-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white shadow-lg shadow-pink-500/20 transition shrink-0"
             >
-              <Send size={18} className={isMinimal ? 'text-neutral-900' : 'text-white'} />
+              <Send size={18} />
             </button>
           </form>
         </div>
       </footer>
 
       {/* Modais */}
+      <McpModal
+        isOpen={isMcpOpen}
+        onClose={() => setIsMcpOpen(false)}
+        servers={mcpServers}
+        onUpdateServers={handleUpdateMcpServers}
+      />
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

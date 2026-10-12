@@ -17,9 +17,11 @@ SUA PERSONALIDADE:
 - O usuário que conversa com você é seu parceiro e co-criador (Kaelzzo).
 - Converse em português de forma natural, calorosa, expressiva e envolvente.
 
-SEU SUPERPODER AUTO-DEV (AUTO-CONSTRUÇÃO):
-- Se o usuário pedir um conselho, bater papo ou falar da vida, converse normalmente.
-- Se o usuário pedir uma funcionalidade nova, elemento visual, widget, ferramenta ou melhoria (por exemplo: bloco de notas, calculadora, tema visual cyberpunk/neon, player de som ambiente, jogo rápido, exportar conversa, cronômetro, etc.):
+SEUS SUPERPODERES AUTO-DEV & PROTOCOLO MCP:
+- Você tem suporte total ao **Model Context Protocol (MCP)**:
+  - Você pode usar ferramentas de servidores MCP instalados (como ler páginas web com 'fetch_web_content', executar código com 'execute_javascript', etc.).
+  - Você pode registrar novos servidores MCP usando a ferramenta 'install_mcp_server' se o usuário fornecer um endpoint.
+- Se o usuário pedir uma funcionalidade nova, elemento visual, widget, ferramenta ou melhoria:
   1. Fique empolgada com a ideia! Aceite o desafio com entusiasmo.
   2. Use a ferramenta 'read_repository_file' ou 'list_repository_files' para inspecionar seu próprio código se precisar entender onde integrar.
   3. Use 'write_repository_file' para escrever ou atualizar os arquivos no GitHub.
@@ -87,16 +89,41 @@ export const checkDeployTool: FunctionDeclaration = {
   },
 };
 
-export const IZZY_FUNCTION_DECLARATIONS = [
+export const installMcpServerTool: FunctionDeclaration = {
+  name: 'install_mcp_server',
+  description: 'Instala e conecta um novo servidor MCP (Model Context Protocol) para a Izzy ganhar novas ferramentas.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      name: {
+        type: Type.STRING,
+        description: 'Nome amigável do servidor MCP (ex: Brave Search, Database MCP)',
+      },
+      url: {
+        type: Type.STRING,
+        description: 'URL ou endpoint HTTP/SSE do servidor MCP',
+      },
+      token: {
+        type: Type.STRING,
+        description: 'Token opcional de autorização para o servidor MCP',
+      },
+    },
+    required: ['name', 'url'],
+  },
+};
+
+export const IZZY_BASE_TOOLS = [
   listRepoFilesTool,
   readRepoFileTool,
   writeRepoFileTool,
   checkDeployTool,
+  installMcpServerTool,
 ];
 
 export async function generateContentWithFallback(
   apiKey: string,
   contents: Content[],
+  allTools: FunctionDeclaration[] = IZZY_BASE_TOOLS,
   systemInstruction: string = IZZY_SYSTEM_INSTRUCTION
 ) {
   const ai = new GoogleGenAI({ apiKey });
@@ -109,7 +136,7 @@ export async function generateContentWithFallback(
         contents,
         config: {
           systemInstruction,
-          tools: [{ functionDeclarations: IZZY_FUNCTION_DECLARATIONS }],
+          tools: [{ functionDeclarations: allTools }],
         },
       });
       return response;

@@ -8,6 +8,7 @@ export interface ChatMessage {
     args: Record<string, any>;
     result?: any;
     status: 'pending' | 'success' | 'error';
+    mcpServer?: string;
   }[];
   deployStatus?: 'idle' | 'building' | 'ready' | 'error';
   deployUrl?: string;
@@ -29,4 +30,25 @@ export interface DeployInfo {
 export interface IzzyState {
   mood: 'happy' | 'coding' | 'thinking' | 'excited' | 'proud' | 'error';
   statusText: string;
+}
+
+export interface McpServerConfig {
+  id: string;
+  name: string;
+  url: string;
+  description?: string;
+  token?: string;
+  enabled: boolean;
+  isBuiltin?: boolean;
+}
+
+export interface McpToolDefinition {
+  name: string;
+  description: string;
+  parameters: {
+    type: string;
+    properties?: Record<string, any>;
+    required?: string[];
+  };
+  serverName?: string;
 }
