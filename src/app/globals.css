@@ -7,10 +7,12 @@
   --foreground: #f8fafc;
 }
 
-body {
+html, body {
   color: var(--foreground);
   background: var(--background);
-  overflow: hidden;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 /* Custom scrollbars */

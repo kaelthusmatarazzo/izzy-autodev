@@ -15,14 +15,20 @@ import {
   Terminal,
   ExternalLink,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import IzzyAvatar from './IzzyAvatar';
 import SettingsModal, { AppConfig } from './SettingsModal';
 import EvolutionSidebar from './EvolutionSidebar';
 import { ChatMessage } from '@/lib/types';
 
+const INITIAL_WELCOME_MESSAGE: ChatMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  content: `Olá! Eu sou a **Izzy**! ✨\n\nEu não sou apenas um chatbot comum: **eu sou o próprio código desta aplicação**! Se você me pedir algo que eu ainda não tenho (um bloco de notas, um tema neon, um tocador de música lo-fi, uma calculadora ou qualquer componente), eu vou abrir meu código, programar a mim mesma, fazer o commit no GitHub e mandar o Vercel compilar a novidade!\n\nComo posso evoluir ou ajudar você hoje?`,
+  timestamp: 1728750000000,
+};
+
 export default function IzzyInterface() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -58,18 +64,16 @@ export default function IzzyInterface() {
           setConfig(JSON.parse(stored));
         } catch {}
       }
-
-      // Mensagem inicial de boas-vindas da Izzy
-      setMessages([
-        {
-          id: 'welcome',
-          role: 'assistant',
-          content: `Olá! Eu sou a **Izzy**! ✨\n\nEu não sou apenas um chatbot comum: **eu sou o próprio código desta aplicação**! Se você me pedir algo que eu ainda não tenho (um bloco de notas, um tema neon, um tocador de música lo-fi, uma calculadora ou qualquer componente), eu vou abrir meu código, programar a mim mesma, fazer o commit no GitHub e mandar o Vercel compilar a novidade!\n\nComo posso evoluir ou ajudar você hoje?`,
-          timestamp: Date.now(),
-        },
-      ]);
     }
   }, []);
+
+  const triggerConfetti = async () => {
+    try {
+      const confettiModule = await import('canvas-confetti');
+      const confetti = confettiModule.default || confettiModule;
+      confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
+    } catch {}
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -138,9 +142,7 @@ export default function IzzyInterface() {
           setTimeout(() => {
             setActiveDeploy((prev) => ({ ...prev, status: 'ready' }));
             setIzzyMood('proud');
-            try {
-              confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-            } catch {}
+            triggerConfetti();
           }, 40000);
         }
       } else {
@@ -174,14 +176,12 @@ export default function IzzyInterface() {
   };
 
   const triggerReload = () => {
-    try {
-      confetti({ particleCount: 80, spread: 60 });
-    } catch {}
+    triggerConfetti();
     window.location.reload();
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans selection:bg-pink-500 selection:text-white">
+    <div className="flex flex-col min-h-[100dvh] h-[100dvh] max-h-[100dvh] bg-slate-950 text-slate-100 font-sans selection:bg-pink-500 selection:text-white">
       {/* Top Header */}
       <header className="h-16 px-4 md:px-8 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
