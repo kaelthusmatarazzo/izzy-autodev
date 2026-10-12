@@ -61,16 +61,20 @@ export async function POST(req: NextRequest) {
       turns++;
       const functionCalls = response.functionCalls;
 
-      // Adiciona a chamada do modelo ao histórico
-      contents.push({
-        role: 'model',
-        parts: functionCalls.map((call) => ({
-          functionCall: {
-            name: call.name,
-            args: call.args as Record<string, any>,
-          },
-        })),
-      });
+      // Preserva o conteúdo original do modelo gerado pelo Gemini (com thoughtSignature e IDs)
+      if (response.candidates && response.candidates[0]?.content) {
+        contents.push(response.candidates[0].content);
+      } else {
+        contents.push({
+          role: 'model',
+          parts: functionCalls.map((call) => ({
+            functionCall: {
+              name: call.name,
+              args: call.args as Record<string, any>,
+            },
+          })),
+        });
+      }
 
       const responseParts: any[] = [];
 
@@ -133,6 +137,7 @@ export async function POST(req: NextRequest) {
           functionResponse: {
             name,
             response: toolResult,
+            ...((call as any).id ? { id: (call as any).id } : {}),
           },
         });
       }

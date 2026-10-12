@@ -1,11 +1,10 @@
 import { GoogleGenAI, Type, FunctionDeclaration, Content } from '@google/genai';
 
 export const CANDIDATE_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
   'gemini-3.5-flash',
   'gemini-3.8-flash',
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash-lite',
-  'gemini-2.5-pro',
 ];
 
 export const IZZY_SYSTEM_INSTRUCTION = `
