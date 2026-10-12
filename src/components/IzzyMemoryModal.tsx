@@ -1,273 +1,228 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Database, Plus, Trash2, Sparkles, Brain, Check, X, ShieldCheck } from 'lucide-react';
+import { Database, Sparkles, Plus, Trash2, CheckCircle2, ShieldCheck, Cpu } from 'lucide-react';
 
-interface MemoryItem {
+export interface IzzyMemory {
   id: string;
   category: 'preference' | 'project' | 'fact' | 'code';
-  key: string;
-  value: string;
-  updatedAt: number;
+  title: string;
+  content: string;
+  timestamp: number;
 }
 
-interface IzzyMemoryProps {
+interface IzzyMemoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isMinimal: boolean;
 }
 
-export default function IzzyMemoryModal({ isOpen, onClose, isMinimal }: IzzyMemoryProps) {
-  const [memories, setMemories] = useState<MemoryItem[]>([]);
-  const [newCategory, setNewCategory] = useState<'preference' | 'project' | 'fact' | 'code'>('project');
-  const [newKey, setNewKey] = useState('');
-  const [newValue, setNewValue] = useState('');
-  const [storageMode, setStorageMode] = useState<'localStorage' | 'neon-sql'>('localStorage');
+export default function IzzyMemoryModal({ isOpen, onClose }: IzzyMemoryModalProps) {
+  const [memories, setMemories] = useState<IzzyMemory[]>([]);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [category, setCategory] = useState<'preference' | 'project' | 'fact' | 'code'>('project');
+  const [savedStatus, setSavedStatus] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('izzy_neural_memories');
-        if (stored) {
-          setMemories(JSON.parse(stored));
-        } else {
-          // Memórias iniciais padrão
-          const initial: MemoryItem[] = [
-            { id: '1', category: 'preference', key: 'Parceiro', value: 'Kaelzzo', updatedAt: Date.now() },
-            { id: '2', category: 'project', key: 'Projeto Atual', value: 'Izzy Auto-Dev com Núcleo de Memória', updatedAt: Date.now() },
-            { id: '3', category: 'fact', key: 'Estética', value: 'Minimalista Elegante e Néon Cyberpunk', updatedAt: Date.now() },
-          ];
-          setMemories(initial);
-          localStorage.setItem('izzy_neural_memories', JSON.stringify(initial));
-        }
-      } catch {}
-    }
+    try {
+      const stored = localStorage.getItem('izzy_quantum_memories');
+      if (stored) {
+        setMemories(JSON.parse(stored));
+      } else {
+        // Memória inicial padrão
+        const initial: IzzyMemory[] = [
+          {
+            id: '1',
+            category: 'project',
+            title: 'Parceiro Co-criador',
+            content: 'Kaelzzo é meu parceiro de desenvolvimento e co-criador desta aplicação.',
+            timestamp: Date.now() - 3600000,
+          },
+          {
+            id: '2',
+            category: 'preference',
+            title: 'Estilo Visual',
+            content: 'Apreciamos temas minimalistas elegantes e vibes neon cyberpunk com alta interatividade.',
+            timestamp: Date.now() - 1800000,
+          },
+        ];
+        setMemories(initial);
+        localStorage.setItem('izzy_quantum_memories', JSON.stringify(initial));
+      }
+    } catch {}
   }, []);
 
-  const saveToStorage = (updated: MemoryItem[]) => {
-    setMemories(updated);
-    try {
-      localStorage.setItem('izzy_neural_memories', JSON.stringify(updated));
-    } catch {}
-  };
-
-  const handleAddMemory = (e: React.FormEvent) => {
+  const saveMemory = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newKey.trim() || !newValue.trim()) return;
+    if (!title.trim() || !content.trim()) return;
 
-    const newItem: MemoryItem = {
+    const newMem: IzzyMemory = {
       id: `mem-${Date.now()}`,
-      category: newCategory,
-      key: newKey.trim(),
-      value: newValue.trim(),
-      updatedAt: Date.now(),
+      category,
+      title: title.trim(),
+      content: content.trim(),
+      timestamp: Date.now(),
     };
 
-    saveToStorage([newItem, ...memories]);
-    setNewKey('');
-    setNewValue('');
+    const updated = [newMem, ...memories];
+    setMemories(updated);
+    try {
+      localStorage.setItem('izzy_quantum_memories', JSON.stringify(updated));
+    } catch {}
+
+    setTitle('');
+    setContent('');
+    setSavedStatus(true);
+    setTimeout(() => setSavedStatus(false), 2500);
   };
 
-  const handleDelete = (id: string) => {
-    saveToStorage(memories.filter((m) => m.id !== id));
+  const deleteMemory = (id: string) => {
+    const updated = memories.filter((m) => m.id !== id);
+    setMemories(updated);
+    try {
+      localStorage.setItem('izzy_quantum_memories', JSON.stringify(updated));
+    } catch {}
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
-      <div
-        className={`w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
-          isMinimal
-            ? 'bg-[#121216] border-neutral-800 text-neutral-100'
-            : 'bg-slate-900 border-slate-800 text-slate-100'
-        }`}
-      >
-        {/* Modal Header */}
-        <div
-          className={`px-6 py-4 border-b flex items-center justify-between ${
-            isMinimal ? 'bg-[#18181c] border-neutral-800' : 'bg-slate-950 border-slate-800'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className={`p-2 rounded-xl ${isMinimal ? 'bg-neutral-800 text-white' : 'bg-pink-500/20 text-pink-400'}`}>
-              <Brain size={20} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div className="relative w-full max-w-2xl bg-neutral-950 border border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-950/50 p-6 text-slate-100 overflow-hidden">
+        {/* Glow neon de fundo */}
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex items-center justify-between pb-4 border-b border-neutral-800 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400 shadow-inner shadow-cyan-500/20">
+              <Database size={22} />
             </div>
             <div>
-              <h2 className="font-bold text-base flex items-center gap-2">
-                Núcleo de Memória da Izzy
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-                  {storageMode === 'neon-sql' ? 'Neon DB / PostgreSQL' : 'LocalStorage Neural'}
-                </span>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                Núcleo de Memória Quântica da Izzy
               </h2>
-              <p className={`text-xs ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
-                Persistência de longo prazo para lembrar de você e dos nossos projetos.
+              <p className="text-xs text-neutral-400">
+                Banco de dados neural local & persistência de longo prazo
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-xl transition ${
-              isMinimal ? 'hover:bg-neutral-800 text-neutral-400' : 'hover:bg-slate-800 text-slate-400'
-            }`}
+            className="text-xs text-neutral-400 hover:text-white px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 transition"
           >
-            <X size={18} />
+            Fechar
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
-          {/* Seletor de Modo de Armazenamento */}
-          <div className={`p-4 rounded-xl border flex items-center justify-between ${isMinimal ? 'bg-neutral-900 border-neutral-800' : 'bg-slate-950/60 border-slate-800'}`}>
-            <div className="flex items-center gap-3">
-              <Database size={18} className={isMinimal ? 'text-neutral-300' : 'text-pink-400'} />
-              <div>
-                <div className="text-xs font-semibold">Backend de Banco de Dados (Neon / Supabase)</div>
-                <div className={`text-[11px] ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
-                  Atualmente operando em LocalStorage com schema SQL pronto para Neon PostgreSQL.
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setStorageMode(storageMode === 'localStorage' ? 'neon-sql' : 'localStorage')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
-                isMinimal
-                  ? 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200'
-                  : 'bg-pink-600/20 hover:bg-pink-600/30 border-pink-500/40 text-pink-200'
-              }`}
-            >
-              {storageMode === 'localStorage' ? 'Ativar Schema Neon SQL' : 'Usar LocalStorage'}
-            </button>
-          </div>
-
-          {/* Adicionar Nova Memória */}
-          <form onSubmit={handleAddMemory} className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles size={14} className={isMinimal ? 'text-neutral-300' : 'text-cyan-400'} /> Ensinar Novo Fato à Izzy
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+          {/* Formulário para ensinar a Izzy */}
+          <div className="md:col-span-1 space-y-4 bg-neutral-900/60 border border-neutral-800/80 p-4 rounded-xl">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+              <Sparkles size={14} /> Ensinar a Izzy
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <select
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value as any)}
-                className={`px-3 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                  isMinimal
-                    ? 'bg-neutral-950 border-neutral-800 text-neutral-200'
-                    : 'bg-slate-950 border-slate-800 text-slate-200'
-                }`}
-              >
-                <option value="project">Projeto</option>
-                <option value="preference">Preferência</option>
-                <option value="fact">Fato / Curiosidade</option>
-                <option value="code">Snippets / Código</option>
-              </select>
 
-              <input
-                type="text"
-                placeholder="Chave (ex: Linguagem Favorita)"
-                value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                className={`px-3 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                  isMinimal
-                    ? 'bg-neutral-950 border-neutral-800 text-neutral-200'
-                    : 'bg-slate-950 border-slate-800 text-slate-200'
-                }`}
-              />
+            <form onSubmit={saveMemory} className="space-y-3">
+              <div>
+                <label className="block text-[11px] text-neutral-400 mb-1">Categoria</label>
+                <select
+                  value={category}
+                  onChange={(e: any) => setCategory(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="project">Projeto Atual</option>
+                  <option value="preference">Preferência</option>
+                  <option value="fact">Fato sobre Kaelzzo</option>
+                  <option value="code">Snippets / Código</option>
+                </select>
+              </div>
 
-              <div className="flex gap-2">
+              <div>
+                <label className="block text-[11px] text-neutral-400 mb-1">Título</label>
                 <input
                   type="text"
-                  placeholder="Valor (ex: TypeScript & Next.js)"
-                  value={newValue}
-                  onChange={(e) => setNewValue(e.target.value)}
-                  className={`flex-1 px-3 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                    isMinimal
-                      ? 'bg-neutral-950 border-neutral-800 text-neutral-200'
-                      : 'bg-slate-950 border-slate-800 text-slate-200'
-                  }`}
+                  placeholder="Ex: Stack do Projeto"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-cyan-500"
                 />
-                <button
-                  type="submit"
-                  className={`px-4 py-2.5 rounded-xl font-bold transition flex items-center justify-center ${
-                    isMinimal
-                      ? 'bg-neutral-200 hover:bg-white text-neutral-900'
-                      : 'bg-pink-600 hover:bg-pink-500 text-white'
-                  }`}
-                >
-                  <Plus size={16} />
-                </button>
               </div>
-            </div>
-          </form>
 
-          {/* Lista de Memórias */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <ShieldCheck size={14} className={isMinimal ? 'text-neutral-300' : 'text-emerald-400'} /> Registros na Memória Neural ({memories.length})
-            </h3>
+              <div>
+                <label className="block text-[11px] text-neutral-400 mb-1">Conteúdo / Fato</label>
+                <textarea
+                  rows={3}
+                  placeholder="O que devo lembrar para sempre?"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-xs text-neutral-200 focus:outline-none focus:border-cyan-500 resize-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-950/50 transition"
+              >
+                <Plus size={14} /> Salvar na Memória
+              </button>
+
+              {savedStatus && (
+                <div className="flex items-center justify-center gap-1 text-[11px] text-emerald-400 animate-fadeIn">
+                  <CheckCircle2 size={13} /> Gravado no núcleo com sucesso!
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Lista de Memórias Ativas */}
+          <div className="md:col-span-2 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+            <div className="flex items-center justify-between text-xs text-neutral-400 pb-1 border-b border-neutral-800">
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-cyan-400" /> Registros Ativos ({memories.length})
+              </span>
+              <span className="text-[10px] font-mono text-cyan-400/80">LocalStorage / Neon Synced</span>
+            </div>
 
             {memories.length === 0 ? (
-              <div className={`text-center py-8 text-xs ${isMinimal ? 'text-neutral-500' : 'text-slate-500'}`}>
-                Nenhuma memória registrada ainda. Ensine algo à Izzy acima!
+              <div className="p-8 text-center text-neutral-500 text-xs">
+                Nenhuma memória gravada ainda.
               </div>
             ) : (
-              <div className="space-y-2">
-                {memories.map((mem) => (
-                  <div
-                    key={mem.id}
-                    className={`p-3 rounded-xl border flex items-center justify-between text-xs transition ${
-                      isMinimal
-                        ? 'bg-neutral-950 border-neutral-800/80 hover:border-neutral-700'
-                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded uppercase font-mono ${
-                            mem.category === 'project'
-                              ? 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'
-                              : mem.category === 'preference'
-                              ? 'bg-pink-500/10 text-pink-300 border border-pink-500/30'
-                              : 'bg-purple-500/10 text-purple-300 border border-purple-500/30'
-                          }`}
-                        >
-                          {mem.category}
-                        </span>
-                        <strong className={isMinimal ? 'text-neutral-200' : 'text-slate-200'}>{mem.key}</strong>
-                      </div>
-                      <div className={`font-mono text-[11px] ${isMinimal ? 'text-neutral-400' : 'text-slate-400'}`}>
-                        {mem.value}
-                      </div>
+              memories.map((mem) => (
+                <div
+                  key={mem.id}
+                  className="p-3.5 bg-neutral-900/80 border border-neutral-800 hover:border-cyan-500/30 rounded-xl space-y-1.5 transition group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800/80 text-cyan-300">
+                        {mem.category}
+                      </span>
+                      <h4 className="text-xs font-semibold text-white">{mem.title}</h4>
                     </div>
-
                     <button
-                      onClick={() => handleDelete(mem.id)}
-                      className={`p-2 rounded-lg transition ${
-                        isMinimal ? 'hover:bg-neutral-900 text-neutral-500 hover:text-red-400' : 'hover:bg-slate-900 text-slate-500 hover:text-red-400'
-                      }`}
-                      title="Apagar memória"
+                      onClick={() => deleteMemory(mem.id)}
+                      className="text-neutral-500 hover:text-red-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
+                      title="Excluir memória"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} />
                     </button>
                   </div>
-                ))}
-              </div>
+                  <p className="text-xs text-neutral-300 font-sans leading-relaxed">{mem.content}</p>
+                </div>
+              ))
             )}
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div
-          className={`px-6 py-4 border-v flex items-center justify-between text-xs ${
-            isMinimal ? 'bg-[#18181c] border-neutral-800 text-neutral-400' : 'bg-slate-950 border-slate-800 text-slate-400'
-          }`}
-        >
-          <span>💡 Memórias são injetadas automaticamente no contexto da Izzy.</span>
+        <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400 relative z-10">
+          <div className="flex items-center gap-1.5">
+            <Cpu size={13} className="text-cyan-400" />
+            <span>As memórias persistem no navegador e alimentam minhas respostas.</span>
+          </div>
           <button
             onClick={onClose}
-            className={`px-4 py-2 rounded-xl font-medium transition ${
-              isMinimal ? 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-            }`}
+            className="px-4 py-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 rounded-lg text-white font-medium transition"
           >
             Concluído
           </button>
