@@ -14,14 +14,14 @@ export default function IzzyAvatar({ mood = 'idle', size = 'md' }: IzzyAvatarPro
     md: 'w-16 h-16',
     lg: 'w-24 h-24',
     xl: 'w-32 h-32',
-  }[size];
+  }[size || 'md'] || 'w-16 h-16';
 
   const iconSizes = {
     sm: 14,
     md: 20,
     lg: 28,
     xl: 36,
-  }[size];
+  }[size || 'md'] || 20;
 
   return (
     <div className="relative inline-flex items-center justify-center select-none group">

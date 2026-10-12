@@ -53,17 +53,21 @@ export default function IzzyInterface() {
     vercelProjectId: '',
   });
 
+  const [isMounted, setIsMounted] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Carregar configurações locais
+  // Carregar configurações locais de forma segura
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('izzy_config');
-      if (stored) {
-        try {
+    setIsMounted(true);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('izzy_config');
+        if (stored) {
           setConfig(JSON.parse(stored));
-        } catch {}
+        }
       }
+    } catch {
+      // ignore storage access error
     }
   }, []);
 
@@ -181,7 +185,7 @@ export default function IzzyInterface() {
   };
 
   return (
-    <div className="flex flex-col min-h-[100dvh] h-[100dvh] max-h-[100dvh] bg-slate-950 text-slate-100 font-sans selection:bg-pink-500 selection:text-white">
+    <div className="flex flex-col min-h-screen h-screen md:h-[100dvh] bg-slate-950 text-slate-100 font-sans selection:bg-pink-500 selection:text-white">
       {/* Top Header */}
       <header className="h-16 px-4 md:px-8 border-b border-slate-800/80 bg-slate-900/60 backdrop-blur-md flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-3">
@@ -342,8 +346,10 @@ export default function IzzyInterface() {
               </div>
             </div>
 
-            <span className="text-[10px] text-slate-500 px-1">
-              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            <span className="text-[10px] text-slate-500 px-1" suppressHydrationWarning>
+              {isMounted
+                ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : ''}
             </span>
           </div>
         ))}

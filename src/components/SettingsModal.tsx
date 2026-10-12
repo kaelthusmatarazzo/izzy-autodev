@@ -32,23 +32,27 @@ export default function SettingsModal({ isOpen, onClose, onSave }: SettingsModal
 
   useEffect(() => {
     // Carregar configurações do localStorage se existirem
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('izzy_config');
-      if (stored) {
-        try {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem('izzy_config');
+        if (stored) {
           setConfig(JSON.parse(stored));
-        } catch {
-          // ignore error
         }
       }
+    } catch {
+      // ignore storage access error
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('izzy_config', JSON.stringify(config));
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('izzy_config', JSON.stringify(config));
+      }
+    } catch {
+      // ignore storage error
     }
     onSave(config);
     setSavedSuccess(true);
